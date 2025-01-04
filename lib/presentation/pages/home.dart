@@ -1,63 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app_test/data/datasource/data_source.dart';
 import 'package:flutter_app_test/domain/models/users_posts.dart';
+import 'package:flutter_app_test/presentation/bloc/user_cubit.dart';
+import 'package:flutter_app_test/presentation/bloc/user_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 
-class MyHomePage extends StatefulWidget {
+class MyHomePage extends StatelessWidget {
   final String title;
-  final DataSource dataSource;
 
-  const MyHomePage({
-    Key? key,
-    required this.title,
-    required this.dataSource,
-  }) : super(key: key);
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  late Future<List<UsersPosts>> _posts;
-
-  @override
-  void initState() {
-    super.initState();
-    _posts = widget.dataSource.fetchPosts();
-  }
+  const MyHomePage({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
+    final userCubit = context.read<UserCubit>();
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.deepPurple,
+        title: Text(title),
         centerTitle: true,
+        backgroundColor: Colors.deepPurple,
       ),
-      body: FutureBuilder<List<UsersPosts>>(
-        future: _posts,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
+      body: BlocBuilder<UserCubit, UserState>(
+        builder: (context, state) {
+          if (state is UserInitial) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 50, color: Colors.red),
-                  Text('Error: ${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16)),
-                ],
+              child: ElevatedButton(
+                onPressed: userCubit.fetchData,
+                child: const Text('Load Posts'),
               ),
             );
-          } else if (snapshot.hasData) {
-            final posts = snapshot.data!;
+          } else if (state is UserLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is UserLoaded) {
             return ListView.builder(
               padding: const EdgeInsets.all(8.0),
-              itemCount: posts.length,
+              itemCount: state.data.length,
               itemBuilder: (context, index) {
-                final post = posts[index];
+                final post = state.data[index];
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8.0),
                   elevation: 4,
@@ -93,31 +72,37 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
             );
+          } else if (state is UserError) {
+            return Center(
+              child: Text(
+                state.message,
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
           } else {
-            return const Center(child: Text('No posts found'));
+            return const Center(child: Text('Unknown state'));
           }
         },
       ),
     );
   }
 
+  // Función para mostrar los detalles de un post (si es necesario)
   void _showPostDetails(BuildContext context, UsersPosts post) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(post.title),
-          content: SingleChildScrollView(
-            child: Text(post.body),
+      builder: (context) => AlertDialog(
+        title: Text(post.title),
+        content: Text(post.body),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Close'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
